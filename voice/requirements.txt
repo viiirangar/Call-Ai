@@ -1,0 +1,11 @@
+# Dépendances du voice-server (à installer après torch)
+flask==3.0.3
+edge-tts==6.1.19
+librosa==0.9.1
+soundfile==0.12.1
+wavmark==0.0.3
+numpy==1.22.0
+unidecode==1.3.7
+inflect==7.0.0
+eng_to_ipa==0.0.2
+pydub==0.25.1

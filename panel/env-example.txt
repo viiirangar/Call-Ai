@@ -1,0 +1,7 @@
+# Exemple de fichier de variables d'environnement — entrez les valeurs dans Vercel → Settings → Environment Variables
+
+# Chaîne de connexion à la base de données gratuite Neon (PostgreSQL) — à obtenir sur neon.tech
+DATABASE_URL=postgresql://user:password@host.neon.tech/neondb?sslmode=require
+
+# Une phrase aléatoire de votre choix (pour la sécurité du service interne)
+WORKER_KEY=my-secret-123

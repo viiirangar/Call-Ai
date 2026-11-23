@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Réglages du bot — toujours une seule ligne avec id = 1
+model BotConfig {
+  id                Int      @id @default(1)
+
+  // ---- Connexion Telegram ----
+  botToken          String   @default("")
+  botUsername       String   @default("")
+  ownerTelegramId   String   @default("")
+  webhookSecret     String   @default("")
+
+  // ---- Intelligence artificielle ----
+  aiProvider        String   @default("demo") // demo | gemini | groq | openai
+  aiApiKey          String   @default("")
+  aiModel           String   @default("")
+  aiBaseUrl         String   @default("")
+
+  // ---- Comportement du bot ----
+  enabled           Boolean  @default(true)
+  replyLanguage     String   @default("fr") // fr | en | de | es | it | fa | ar
+  timezone          String   @default("Europe/Paris")
+  workHoursEnabled  Boolean  @default(false)
+  workStart         String   @default("09:00")
+  workEnd           String   @default("18:00")
+  awayMessage       String   @default("Merci pour votre message ! Je suis actuellement indisponible, je vous réponds dès que possible.")
+  hideAiIdentity    Boolean  @default(true)
+  maxHistory        Int      @default(12)
+
+  // ---- Personnalité et connaissances ----
+  ownerName         String   @default("")
+  businessInfo      String   @default("")
+  personality       String   @default("")
+  toneCustomer      String   @default("")
+  toneFriend        String   @default("")
+  toneColleague     String   @default("")
+  extraInstructions String   @default("")
+  faqs              String   @default("[]") // JSON: [{"q":"...","a":"..."}]
+  signature         String   @default("")
+  fallbackMessage   String   @default("Là je ne suis pas certain de la réponse, je reviens vers vous très vite avec une réponse précise.")
+
+  // ---- Répondeur d'appels téléphoniques ----
+  callApiToken      String   @default("")
+  callEnabled       Boolean  @default(true)
+  callGreeting      String   @default("Bonjour ! Un instant s'il vous plaît, je vous écoute.")
+  callGoodbye       String   @default("Merci pour votre appel, très bonne journée !")
+  callVoiceMode     String   @default("phone") // clone | ms | phone — sur serveur cloud, la voix du téléphone lui-même
+  callVoiceName     String   @default("fr-FR-DeniseNeural") // voix de base Microsoft
+
+  updatedAt         DateTime @updatedAt
+}
+
+// Chaque discussion Telegram est une conversation
+model Conversation {
+  id             String    @id @default(cuid())
+  telegramChatId String    @unique
+  contactName    String    @default("")
+  audienceMode   String    @default("auto") // auto | customer | friend | colleague
+  lastAudience   String    @default("unknown") // dernière détection: customer | friend | colleague | unknown
+  needsAttention Boolean   @default(false)
+  messageCount   Int       @default(0)
+  lastMessageAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  messages       Message[]
+
+  @@index([lastMessageAt])
+}
+
+// Messages échangés
+model Message {
+  id                String       @id @default(cuid())
+  conversationId    String
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role              String       // user | assistant | system_note
+  content           String
+  telegramMessageId String?
+  createdAt         DateTime     @default(now())
+
+  @@unique([conversationId, telegramMessageId])
+  @@index([conversationId, createdAt])
+}

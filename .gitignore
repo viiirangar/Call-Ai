@@ -1,0 +1,48 @@
+# === Secrets & Environment ===
+.env
+.env.local
+.env.production
+*.env
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# === Voice & AI Models (حجم بالا + خصوصی) ===
+voice/samples/
+voice/models/
+*.pt
+*.pth
+*.onnx
+*.wav
+*.mp3
+*.ogg
+
+# === Database ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+
+# === OS ===
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# === Logs ===
+*.log
+logs/
+
+# === Install artifacts ===
+install.log

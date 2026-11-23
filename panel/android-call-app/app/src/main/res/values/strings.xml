@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Assistant Français</string>
+    <string name="app_title">Répondeur d'appel automatique</string>
+    <string name="app_subtitle">Répond automatiquement aux appels entrants en français — le même cerveau IA que votre panneau</string>
+    <string name="label_server">Adresse du serveur (copiez-la depuis l'onglet « Appels téléphoniques » du panneau)</string>
+    <string name="label_token">Code de sécurité des appels (depuis le panneau)</string>
+    <string name="label_enabled">Activer la réponse automatique aux appels</string>
+    <string name="btn_save">Enregistrer les réglages</string>
+    <string name="btn_test">Tester la connexion au serveur</string>
+    <string name="btn_permissions">Accorder les autorisations téléphone et microphone</string>
+    <string name="btn_battery">Désactiver l'optimisation de la batterie (important)</string>
+    <string name="help_block">Aide : après avoir enregistré les réglages et accordé les autorisations, appelez votre propre numéro depuis un autre téléphone — l'application répond automatiquement et converse en français. Si l'application ne répond pas : vérifiez l'interrupteur d'activation, désactivez l'optimisation de la batterie et assurez-vous d'avoir créé le code de sécurité dans le panneau. Toute la conversation de chaque appel est enregistrée dans l'onglet « Conversations » du panneau.</string>
+</resources>

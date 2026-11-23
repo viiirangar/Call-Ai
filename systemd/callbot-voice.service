@@ -1,0 +1,15 @@
+[Unit]
+Description=My French Assistant - Voice Server (OpenVoice, port 3020)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/callbot/voice
+ExecStart=/opt/callbot/voice/venv/bin/python voice_server.py
+Restart=always
+RestartSec=5
+Environment=VOICE_PORT=3020
+MemoryMax=1500M
+
+[Install]
+WantedBy=multi-user.target
