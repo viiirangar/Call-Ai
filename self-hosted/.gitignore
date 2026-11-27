@@ -2,3 +2,8 @@
 /data/
 *.sqlite
 *.sqlite-*
+*.apk
+*.idsig
+*.p12
+*.jks
+/android/build/
