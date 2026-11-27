@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Call-Ai · Mémoire</title>
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
+</head>
+<body>
+  <header class="shell-header">
+    <span class="wordmark">Call-Ai</span>
+    <button id="logout" class="quiet" type="button" hidden>Se déconnecter</button>
+  </header>
+  <main>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="login-view" hidden>
+      <h1>Accès au panneau</h1>
+      <form id="login" method="post">
+        <label for="password">Mot de passe</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Se connecter</button>
+      </form>
+    </section>
+    <section id="workspace" hidden>
+      <h1>Mémoire</h1>
+      <div class="workspace-grid">
+        <section class="library" aria-labelledby="documents-title">
+          <h2 id="documents-title">Documents et notes</h2>
+          <form class="search" id="search">
+            <label class="sr-only" for="query">Chercher dans la mémoire</label>
+            <input id="query" type="search" placeholder="Chercher dans la mémoire" maxlength="160">
+            <button type="submit">Chercher</button>
+          </form>
+          <p id="empty" hidden>Aucun résultat.</p>
+          <ul id="results"></ul>
+          <button id="more" class="quiet" type="button" hidden>Afficher la suite</button>
+        </section>
+        <aside aria-label="Ajouter à la mémoire">
+          <h2>Nouvelle note</h2>
+          <form id="note" method="post">
+            <label for="note-title">Titre</label>
+            <input id="note-title" maxlength="160" required>
+            <label for="note-text">Texte</label>
+            <textarea id="note-text" rows="5" maxlength="500000" required></textarea>
+            <button type="submit">Enregistrer la note</button>
+          </form>
+          <h2>Importer un PDF</h2>
+          <form id="pdf" method="post">
+            <label for="pdf-file">PDF contenant du texte</label>
+            <input id="pdf-file" type="file" accept="application/pdf,.pdf" required>
+            <button type="submit">Importer le texte</button>
+          </form>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <dialog id="document" aria-labelledby="document-title">
+    <div class="dialog-header">
+      <h2 id="document-title"></h2>
+      <form method="dialog"><button class="quiet" type="submit">Fermer</button></form>
+    </div>
+    <pre id="document-text" tabindex="0"></pre>
+    <button class="danger" id="delete" type="button">Supprimer</button>
+  </dialog>
+</body>
+</html>
