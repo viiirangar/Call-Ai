@@ -10,5 +10,6 @@ process.umask(0o077);
 mkdirSync(dirname(database), { recursive: true, mode: 0o700 });
 const assistant = localAssistant({ model: process.env.CALLAI_MODEL, ollamaOrigin: process.env.CALLAI_OLLAMA_ORIGIN,
   whisperOrigin: process.env.CALLAI_WHISPER_ORIGIN });
-const app = createApp({ database, password: process.env.CALLAI_PASSWORD, publicOrigin: process.env.CALLAI_PUBLIC_ORIGIN, assistant });
+const app = createApp({ database, password: process.env.CALLAI_PASSWORD, publicOrigin: process.env.CALLAI_PUBLIC_ORIGIN, assistant,
+  byokSecret: process.env.CALLAI_BYOK_SECRET || process.env.CALLAI_PASSWORD });
 app.listen(port, '127.0.0.1', () => console.log(`Call-Ai: http://127.0.0.1:${port}`));

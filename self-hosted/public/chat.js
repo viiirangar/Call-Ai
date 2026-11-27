@@ -49,8 +49,9 @@ async function loadAssistant() {
     const state = await api('/api/assistant');
     if (version !== sessionVersion) return;
     voiceEnabled = state.voice;
-    byId('assistant-state').textContent = state.chat ? 'Modèle local configuré' : 'Modèle local à connecter';
-    byId('settings-model').textContent = state.chat ? 'Configuré sur le serveur' : 'Configuration requise sur le serveur';
+    const remote = state.provider === 'nvidia' || state.provider === 'compatible';
+    byId('assistant-state').textContent = remote ? 'Modèle distant configuré' : (state.chat ? 'Modèle local configuré' : 'Modèle à connecter');
+    byId('settings-model').textContent = remote ? 'Config. BYOK depuis l’app Android' : (state.chat ? 'Configuré sur le serveur' : 'Configuration requise');
     byId('settings-whisper').textContent = state.voice ? 'Configuré sur le serveur' : 'Configuration requise sur le serveur';
     byId('reply-language').value = state.language;
     showMessages(state.messages);

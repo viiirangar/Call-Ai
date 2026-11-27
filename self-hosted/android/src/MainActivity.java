@@ -21,8 +21,11 @@ import android.text.InputFilter;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.WindowInsets;
+import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -156,7 +159,7 @@ public final class MainActivity extends Activity {
 
     private void showChat() {
         page = "chat";
-        frame("Call-Ai", assistant.optBoolean("chat") ? "Assistant personnel" : "Modèle local à connecter sur le serveur");
+        frame("Call-Ai", assistant.optBoolean("chat") ? "Assistant personnel" : "Configurez votre modèle dans Réglages");
         navigation();
         messages = stack();
         chatScroll = scroll(messages);
@@ -423,6 +426,9 @@ public final class MainActivity extends Activity {
         navigation();
         LinearLayout settings = stack();
         root.addView(scroll(settings), weighted());
+        addStatus(settings);
+        LinearLayout providerSection = stack();
+        settings.addView(providerSection);
         settings.addView(label("Langue des réponses", 16, INK, true));
         Spinner languages = new Spinner(this);
         String[] codes = {"auto", "fr", "fa"};
@@ -438,11 +444,79 @@ public final class MainActivity extends Activity {
                 status.setText("Langue enregistrée.");
             });
         }));
-        settings.addView(label("Ollama · " + (assistant.optBoolean("chat") ? "configuré" : "à connecter"), 16, INK, false));
         settings.addView(label("Whisper · " + (assistant.optBoolean("voice") ? "configuré" : "à connecter"), 16, INK, false));
         settings.addView(label("Appels Proximus · connexion téléphonique en attente", 16, MUTED, false));
         settings.addView(button("Se déconnecter", false, () -> perform("Déconnexion…", () -> api.request("DELETE", "/api/session", null, null), result -> login())));
-        addStatus(settings);
+        loadProvider(providerSection, "");
+    }
+
+    private void loadProvider(LinearLayout section, String after) {
+        perform("Chargement du modèle…", () -> new JSONObject(api.get("/api/assistant/provider")), configuration -> {
+            showProvider(section, configuration);
+            if (!after.isEmpty()) status.setText(after);
+        });
+    }
+
+    private void showProvider(LinearLayout section, JSONObject configuration) {
+        section.removeAllViews();
+        section.addView(label("Modèle IA · BYOK", 21, INK, true));
+        section.addView(label("Vos messages et les extraits utiles de votre mémoire sont transmis au fournisseur sélectionné.", 14, MUTED, false));
+        boolean saved = configuration.optBoolean("keyConfigured");
+        section.addView(label(saved ? "Clé API enregistrée" : "Aucune clé API enregistrée", 14, BLUE, true));
+
+        Spinner provider = new Spinner(this);
+        ArrayAdapter<String> options = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
+            new String[]{"NVIDIA NIM", "API compatible OpenAI"});
+        options.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        provider.setAdapter(options);
+        provider.setContentDescription("Fournisseur du modèle");
+        section.addView(provider);
+        boolean compatible = configuration.optString("provider").equals("compatible");
+        provider.setSelection(compatible ? 1 : 0);
+
+        LinearLayout custom = stack();
+        EditText baseUrl = field(custom, "Adresse HTTPS de l’API", "https://api.example.com/v1", 500,
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        if (compatible) baseUrl.setText(configuration.optString("baseUrl"));
+        custom.setVisibility(compatible ? View.VISIBLE : View.GONE);
+        section.addView(custom);
+        provider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                custom.setVisibility(position == 1 ? View.VISIBLE : View.GONE);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+
+        EditText model = field(section, "Identifiant du modèle", "Nom du modèle chez le fournisseur", 160, InputType.TYPE_CLASS_TEXT);
+        model.setText(configuration.optString("model"));
+        EditText key = field(section, "Clé API", saved ? "Laissez vide pour garder la clé de cette adresse" : "Collez votre clé API", 2048,
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        key.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        key.setImeOptions(key.getImeOptions() | EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        section.addView(button("Enregistrer le modèle", true, () -> {
+            boolean customProvider = provider.getSelectedItemPosition() == 1;
+            String tag = customProvider ? "compatible" : "nvidia";
+            String url = customProvider ? baseUrl.getText().toString().trim() : "";
+            String identifier = model.getText().toString().trim();
+            String secret = key.getText().toString().trim();
+            if (identifier.isEmpty()) { model.setError("Identifiant requis"); return; }
+            if (customProvider && url.isEmpty()) { baseUrl.setError("Adresse requise"); return; }
+            perform("Enregistrement du modèle…", () -> api.json("PUT", "/api/assistant/provider",
+                new JSONObject().put("provider", tag).put("model", identifier).put("baseUrl", url).put("apiKey", secret).toString()), result -> {
+                    key.setText("");
+                    loadProvider(section, "Modèle enregistré.");
+                });
+        }));
+        if (saved) {
+            section.addView(button("Tester le modèle enregistré", false, () -> perform("Test du fournisseur…",
+                () -> api.request("POST", "/api/assistant/provider/test", null, null), result -> status.setText("Le modèle a répondu."))));
+            section.addView(button("Supprimer la clé", false, () -> new AlertDialog.Builder(this)
+                .setMessage("Supprimer la clé API enregistrée ?")
+                .setNegativeButton("Annuler", null)
+                .setPositiveButton("Supprimer", (dialog, option) -> perform("Suppression…",
+                    () -> api.request("DELETE", "/api/assistant/provider", null, null), result -> loadProvider(section, "Clé supprimée.")))
+                .show()));
+        }
     }
 
     private <T> void perform(String pending, Callable<T> work, Consumer<T> success) {

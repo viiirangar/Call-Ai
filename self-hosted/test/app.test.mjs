@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createApp } from '../app.mjs';
 import { localAssistant } from '../assistant.mjs';
+import { isPublicIPv4 } from '../byok.mjs';
 import { createServer } from 'node:http';
 
 test('protects private data, blocks cross-origin writes, and revokes signed-out sessions', async () => {
@@ -125,9 +126,70 @@ test('sends the Ollama JSON and Whisper multipart formats to loopback only', asy
   }
 });
 
-async function withApp(database, check, extractPdf, assistant) {
+test('owner can choose NVIDIA or a compatible endpoint without disclosing or moving a saved key', async () => {
+  const requests = [];
+  await withApp(':memory:', async ({ request, owner }) => {
+    const route = '/api/assistant/provider';
+    assert.equal((await request(route)).status, 401);
+    const headers = await owner();
+    const key = 'nvapi-test-only-fake-value';
+    const save = (json) => request(route, { method: 'PUT', headers, json });
+    assert.equal((await save({ provider: 'nvidia', model: 'nvidia/example', apiKey: key })).status, 204);
+    const state = await (await request(route, { headers })).json();
+    assert.equal(state.provider, 'nvidia');
+    assert.equal(state.keyConfigured, true);
+    assert.ok(!JSON.stringify(state).includes(key));
+    assert.equal((await save({ provider: 'nvidia', model: 'nvidia/another' })).status, 204);
+    assert.equal((await save({ provider: 'compatible', model: 'example', baseUrl: 'https://api.example.com/v1' })).status, 400);
+    assert.equal((await save({ provider: 'compatible', model: 'example', baseUrl: 'https://127.0.0.1/v1', apiKey: key })).status, 400);
+    const reply = await request('/api/assistant/chat', { method: 'POST', headers, json: { text: 'Bonjour' } });
+    assert.equal(reply.status, 201);
+    assert.equal((await reply.json()).reply.text, 'Bonsoir.');
+    assert.equal(requests[0].url, 'https://integrate.api.nvidia.com/v1/chat/completions');
+    assert.equal(requests[0].apiKey, key);
+    assert.equal(requests[0].body.model, 'nvidia/another');
+    assert.equal((await save({ provider: 'compatible', model: 'example', baseUrl: 'https://api.example.com/v1/chat/completions', apiKey: 'user-owned-key' })).status, 204);
+    assert.equal((await request(`${route}/test`, { method: 'POST', headers })).status, 200);
+    assert.equal(requests[1].url, 'https://api.example.com/v1/chat/completions');
+    assert.deepEqual(requests[1].body.messages, [{ role: 'user', content: 'Répondez simplement OK.' }]);
+    assert.equal(requests[1].apiKey, 'user-owned-key');
+    assert.equal((await request(route, { method: 'DELETE', headers })).status, 204);
+    assert.equal((await request('/api/assistant/chat', { method: 'POST', headers, json: { text: 'Bonjour' } })).status, 503);
+  }, undefined, undefined, async (url, apiKey, body) => {
+    requests.push({ url: url.href, apiKey, body });
+    return { choices: [{ message: { content: 'Bonsoir.' } }] };
+  });
+});
+
+test('BYOK survives a restart as encrypted data and validates endpoint address ranges', async () => {
+  for (const address of ['127.0.0.1', '10.0.0.25', '169.254.169.254', '192.168.1.1', '100.64.0.1', '::1']) {
+    assert.equal(isPublicIPv4(address), false);
+  }
+  assert.equal(isPublicIPv4('8.8.8.8'), true);
+  const folder = await mkdtemp(join(tmpdir(), 'call-ai-key-test-'));
+  const database = join(folder, 'test.sqlite');
+  const key = 'test-NVIDIA-ciphertext-must-not-contain-me';
+  const route = '/api/assistant/provider';
+  try {
+    await withApp(database, async ({ request, owner }) => {
+      const response = await request(route, { method: 'PUT', headers: await owner(), json: { provider: 'nvidia', model: 'nvidia/example', apiKey: key } });
+      assert.equal(response.status, 204);
+    });
+    assert.equal((await readFile(database)).includes(Buffer.from(key)), false);
+    await withApp(database, async ({ request, owner }) => {
+      assert.equal((await request(`${route}/test`, { method: 'POST', headers: await owner() })).status, 200);
+    }, undefined, undefined, async (url, credential) => {
+      assert.equal(credential, key);
+      return { choices: [{ message: { content: 'OK' } }] };
+    });
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+async function withApp(database, check, extractPdf, assistant, providerTransport) {
   const password = 'test-owner-password-for-local-run';
-  const server = createApp({ password, database, extractPdf, assistant });
+  const server = createApp({ password, database, extractPdf, assistant, providerTransport });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const origin = `http://127.0.0.1:${server.address().port}`;
