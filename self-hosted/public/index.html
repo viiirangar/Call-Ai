@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>Call-Ai · Mémoire</title>
+  <title>Call-Ai · Assistant personnel</title>
   <link rel="stylesheet" href="/panel.css">
   <script src="/panel.js" defer></script>
+  <script src="/chat.js" defer></script>
 </head>
 <body>
   <header class="shell-header">
-    <span class="wordmark">Call-Ai</span>
+    <span class="wordmark"><span class="brand-mark" aria-hidden="true">C</span> Call-Ai</span>
     <button id="logout" class="quiet" type="button" hidden>Se déconnecter</button>
   </header>
   <main>
@@ -23,7 +24,37 @@
         <button type="submit">Se connecter</button>
       </form>
     </section>
-    <section id="workspace" hidden>
+    <div id="workspace" hidden>
+      <nav class="navigation" aria-label="Sections du panneau">
+        <button type="button" data-view="assistant" aria-current="page">Assistant</button>
+        <button type="button" data-view="memory">Mémoire</button>
+        <button type="button" data-view="settings">Réglages</button>
+      </nav>
+      <section id="assistant-view" class="assistant-view" aria-labelledby="assistant-title">
+        <header class="assistant-header">
+          <h1 id="assistant-title">Assistant personnel</h1>
+          <p id="assistant-state" role="status">Vérification du modèle local…</p>
+        </header>
+        <div id="chat-welcome" class="chat-welcome">
+          <h2>Comment puis-je vous aider&nbsp;?</h2>
+          <p>Écrivez un message ou utilisez le micro. Je peux aussi m’appuyer sur vos notes et vos documents.</p>
+          <div class="suggestions">
+            <button type="button" data-suggestion="Aide-moi à préparer mon prochain entretien.">Préparer un entretien</button>
+            <button type="button" data-suggestion="Aide-moi à rédiger un message professionnel en français.">Rédiger un message</button>
+          </div>
+        </div>
+        <div id="chat-messages" class="chat-messages" role="log" aria-label="Conversation" aria-live="polite" hidden></div>
+        <form id="chat-form" class="composer" method="post">
+          <label class="sr-only" for="chat-input">Votre message</label>
+          <textarea id="chat-input" rows="2" maxlength="4000" placeholder="Écrivez à votre assistant…" required></textarea>
+          <div class="composer-actions">
+            <button id="chat-mic" class="quiet" type="button" aria-pressed="false">Micro</button>
+            <span id="chat-status" role="status"></span>
+            <button type="submit">Envoyer</button>
+          </div>
+        </form>
+      </section>
+      <section id="memory-view" hidden>
       <h1>Mémoire</h1>
       <div class="workspace-grid">
         <section class="library" aria-labelledby="documents-title">
@@ -54,7 +85,25 @@
           </form>
         </aside>
       </div>
-    </section>
+      </section>
+      <section id="settings-view" class="settings-view" hidden>
+        <h1>Réglages</h1>
+        <form id="assistant-preferences" class="preferences" method="post">
+          <label for="reply-language">Langue des réponses</label>
+          <select id="reply-language">
+            <option value="auto">Langue du message</option>
+            <option value="fr">Français</option>
+            <option value="fa">Persan</option>
+          </select>
+          <button type="submit">Enregistrer la langue</button>
+        </form>
+        <dl class="service-list">
+          <div><dt>Dialogue IA · Ollama</dt><dd id="settings-model">Vérification…</dd></div>
+          <div><dt>Dictée · Whisper</dt><dd id="settings-whisper">Vérification…</dd></div>
+          <div><dt>Appels Proximus</dt><dd>Connexion téléphonique en attente</dd></div>
+        </dl>
+      </section>
+    </div>
   </main>
   <dialog id="document" aria-labelledby="document-title">
     <div class="dialog-header">

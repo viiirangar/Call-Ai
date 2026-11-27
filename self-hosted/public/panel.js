@@ -29,6 +29,7 @@ function setView(signedIn) {
     byId('search').reset();
     query = '';
   }
+  document.dispatchEvent(new CustomEvent('panel-session', { detail: signedIn }));
 }
 
 async function api(path, options) {

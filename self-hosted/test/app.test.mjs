@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createApp } from '../app.mjs';
+import { localAssistant } from '../assistant.mjs';
+import { createServer } from 'node:http';
 
 test('protects private data, blocks cross-origin writes, and revokes signed-out sessions', async () => {
   await withApp(':memory:', async ({ request, login }) => {
@@ -66,9 +68,66 @@ test('accepts authenticated PDF text extraction and rejects non-PDF data', async
   }, async () => 'Mécanicien automobile.');
 });
 
-async function withApp(database, check, extractPdf) {
+test('uses local assistant adapters for chat and dictation, and persists the successful exchange', async () => {
+  const context = [];
+  const assistant = {
+    async complete(messages) { context.push(...messages); return 'Jeudi à dix heures.'; },
+    async transcribe(bytes, type) { assert.equal(bytes.toString(), 'test audio'); assert.equal(type, 'audio/webm'); return 'Rendez-vous garage'; },
+  };
+  await withApp(':memory:', async ({ request, owner }) => {
+    assert.equal((await request('/api/assistant')).status, 401);
+    const headers = await owner();
+    const pdfNote = await request('/api/entries', { method: 'POST', headers,
+      json: { title: 'Garage', text: 'Le rendez-vous est jeudi à dix heures.' } });
+    assert.equal(pdfNote.status, 201);
+    const transcript = await request('/api/assistant/audio', { method: 'POST',
+      headers: { ...headers, 'Content-Type': 'audio/webm' }, body: 'test audio' });
+    assert.deepEqual(await transcript.json(), { text: 'Rendez-vous garage' });
+    assert.equal((await request('/api/assistant/preferences', { method: 'PUT', headers, json: { language: 'fr' } })).status, 204);
+    const reply = await request('/api/assistant/chat', { method: 'POST', headers, json: { text: 'Rendez-vous garage ?' } });
+    assert.equal(reply.status, 201);
+    assert.equal((await reply.json()).reply.text, 'Jeudi à dix heures.');
+    assert.match(context[0].content, /Le rendez-vous est jeudi/);
+    assert.match(context[0].content, /Always reply in French/);
+    assert.equal(context.at(-1).content, 'Rendez-vous garage ?');
+    const state = await (await request('/api/assistant', { headers })).json();
+    assert.deepEqual(state.messages.map(({ role }) => role), ['user', 'assistant']);
+    assert.equal(state.language, 'fr');
+  }, undefined, assistant);
+});
+
+test('sends the Ollama JSON and Whisper multipart formats to loopback only', async () => {
+  const received = [];
+  const service = createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    received.push({ path: request.url, type: request.headers['content-type'], body: Buffer.concat(chunks).toString() });
+    response.setHeader('Content-Type', 'application/json');
+    response.end(JSON.stringify(request.url === '/api/chat' ? { message: { content: 'Bonjour' } } : { text: 'Bonjour à vous' }));
+  });
+  service.listen(0, '127.0.0.1');
+  await once(service, 'listening');
+  try {
+    const origin = `http://127.0.0.1:${service.address().port}`;
+    const assistant = localAssistant({ model: 'test-model', ollamaOrigin: origin, whisperOrigin: origin });
+    const messages = [{ role: 'user', content: 'Bonjour' }];
+    assert.equal(await assistant.complete(messages), 'Bonjour');
+    assert.equal(await assistant.transcribe(Buffer.from('audio'), 'audio/webm'), 'Bonjour à vous');
+    assert.equal(received[0].path, '/api/chat');
+    assert.deepEqual(JSON.parse(received[0].body), { model: 'test-model', messages, stream: false });
+    assert.equal(received[1].path, '/inference');
+    assert.match(received[1].type, /^multipart\/form-data; boundary=/);
+    assert.match(received[1].body, /name="file"; filename="dictation.webm"/);
+    assert.match(received[1].body, /name="response_format"\r\n\r\njson/);
+    assert.throws(() => localAssistant({ whisperOrigin: 'https://outside.example' }), /loopback/);
+  } finally {
+    await new Promise(resolve => service.close(resolve));
+  }
+});
+
+async function withApp(database, check, extractPdf, assistant) {
   const password = 'test-owner-password-for-local-run';
-  const server = createApp({ password, database, extractPdf });
+  const server = createApp({ password, database, extractPdf, assistant });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const origin = `http://127.0.0.1:${server.address().port}`;
